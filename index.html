@@ -244,9 +244,17 @@
                 subtext.textContent = `[${task.date}, ${task.time}]`;
                 subtext.className = 'task-subtext whitespace-nowrap ml-4';
 
+                // Delete Button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = '&times;';
+                deleteBtn.title = "Delete task";
+                deleteBtn.className = 'ml-auto text-4xl leading-none font-light opacity-30 hover:opacity-100 transition-opacity cursor-pointer px-2 pb-1';
+                deleteBtn.addEventListener('click', () => deleteTask(task.id));
+
                 taskDiv.appendChild(cb);
                 taskDiv.appendChild(textSpan);
                 taskDiv.appendChild(subtext);
+                taskDiv.appendChild(deleteBtn);
                 
                 taskList.appendChild(taskDiv);
             });
@@ -254,17 +262,28 @@
             updateStats();
         }
 
+        // Toggle task completion
         function toggleTask(id, isCompleted, element) {
-            const task = tasks.find(t => t.id === id);
-            if (task) {
-                task.completed = isCompleted;
-                if (isCompleted) {
+            const taskIndex = tasks.findIndex(t => t.id === id);
+            if (taskIndex > -1) {
+                tasks[taskIndex].completed = isCompleted;
+                
+                // Fire confetti if checked off
+                if (isCompleted && element) {
                     triggerConfetti(element);
                 }
+                
                 renderTasks();
             }
         }
 
+        // Delete task
+        function deleteTask(id) {
+            tasks = tasks.filter(t => t.id !== id);
+            renderTasks();
+        }
+
+        // Confetti Animation
         function triggerConfetti(element) {
             // Get exact coordinates of the checkbox
             const rect = element.getBoundingClientRect();
