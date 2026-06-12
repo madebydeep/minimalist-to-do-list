@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic To-Do List</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-color: #8a0000;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* Input placeholders */
+        input::placeholder {
+            color: var(--text-color) !important;
+            opacity: 0.5 !important;
+        }
+
+        /* Custom Checkbox Styling */
+        input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 1.5rem;
+            height: 1.5rem;
+            border: 3px solid var(--text-color);
+            border-radius: 0.25rem;
+            display: grid;
+            place-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-right: 0.5rem;
+        }
+
+        input[type="checkbox"]::before {
+            content: "";
+            width: 0.75rem;
+            height: 0.75rem;
+            transform: scale(0);
+            transition: 120ms transform ease-in-out;
+            box-shadow: inset 1em 1em var(--text-color);
+            background-color: var(--text-color);
+            transform-origin: center;
+            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+        }
+
+        input[type="checkbox"]:checked::before {
+            transform: scale(1);
+        }
+
+        input[type="checkbox"]:disabled {
+            cursor: not-allowed;
+            opacity: 0.4;
+        }
+
+        /* Color Picker Reset */
+        input[type="color"] {
+            appearance: none;
+            -moz-appearance: none;
+            -webkit-appearance: none;
+            background: none;
+            border: 0;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border: 2px solid var(--text-color);
+            border-radius: 50%;
+        }
+
+        .task-subtext {
+            font-size: 0.75rem;
+            font-weight: 500;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-8 md:p-16">
+    
+    <header class="flex justify-between items-start mb-12">
+        <h2 id="greeting" class="text-3xl md:text-5xl font-extrabold tracking-tight"></h2>
+        
+        <div class="flex items-center gap-6">
+            <div class="flex flex-col items-center gap-1">
+                <span class="text-[10px] uppercase tracking-wider font-bold">Text</span>
+                <input type="color" id="textColorPicker" value="#8a0000">
+            </div>
+            <div class="flex flex-col items-center gap-1">
+                <span class="text-[10px] uppercase tracking-wider font-bold">Bg</span>
+                <input type="color" id="bgColorPicker" value="#000000">
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow flex flex-col w-full max-w-4xl">
+        <!-- Input Area -->
+        <div class="flex items-center gap-4 mb-8">
+            <input type="checkbox" id="mainCheckbox" disabled>
+            <input type="text" id="mainInput" placeholder="Add your task..." class="bg-transparent border-none outline-none text-2xl md:text-3xl w-full">
+        </div>
+        
+        <!-- Task List -->
+        <div id="taskList" class="flex flex-col gap-6">
+            <!-- Tasks injected via JS -->
+        </div>
+    </main>
+
+    <!-- Stats Footer -->
+    <footer id="stats" class="mt-auto pt-12 text-lg font-bold opacity-0 transition-opacity duration-500">
+        <!-- Stats injected via JS -->
+    </footer>
+
+    <script>
+        let tasks = [];
+        
+        // DOM Elements
+        const greetingEl = document.getElementById('greeting');
+        const mainInput = document.getElementById('mainInput');
+        const mainCheckbox = document.getElementById('mainCheckbox');
+        const taskList = document.getElementById('taskList');
+        const statsEl = document.getElementById('stats');
+        
+        const textColorPicker = document.getElementById('textColorPicker');
+        const bgColorPicker = document.getElementById('bgColorPicker');
+
+        function updateGreeting() {
+            const hour = new Date().getHours();
+            let greeting = 'Good evening';
+            if (hour >= 5 && hour < 12) greeting = 'Good morning';
+            else if (hour >= 12 && hour < 17) greeting = 'Good afternoon';
+            else if (hour >= 22 || hour < 5) greeting = 'Good night';
+            greetingEl.textContent = greeting;
+        }
+
+        // Enable/Disable main checkbox based on text input
+        mainInput.addEventListener('input', (e) => {
+            mainCheckbox.disabled = e.target.value.trim() === '';
+        });
+
+        // Add task via Checkbox click
+        mainCheckbox.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent it from actually checking
+            addTask();
+        });
+
+        // Add task via Enter key
+        mainInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && mainInput.value.trim() !== '') {
+                addTask();
+            }
+        });
+
+        function addTask() {
+            const text = mainInput.value.trim();
+            if (!text) return;
+
+            const now = new Date();
+            const dateStr = now.toLocaleDateString();
+            const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const newTask = {
+                id: Date.now().toString(),
+                text: text,
+                completed: false,
+                date: dateStr,
+                time: timeStr
+            };
+
+            tasks.push(newTask);
+            
+            // Reset input area
+            mainInput.value = '';
+            mainCheckbox.disabled = true;
+            
+            renderTasks();
+        }
+
+        function renderTasks() {
+            taskList.innerHTML = '';
+
+            tasks.forEach(task => {
+                const taskDiv = document.createElement('div');
+                taskDiv.className = 'flex items-center gap-4 group';
+
+                // Checkbox
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = task.completed;
+                cb.addEventListener('change', (e) => toggleTask(task.id, e.target.checked, e.target));
+
+                // Text (with Double Click to Edit logic)
+                const textSpan = document.createElement('span');
+                textSpan.textContent = task.text;
+                textSpan.className = `flex-grow text-xl md:text-2xl cursor-pointer select-none transition-all ${task.completed ? 'opacity-50 line-through' : ''}`;
+                
+                textSpan.addEventListener('dblclick', () => {
+                    const editInput = document.createElement('input');
+                    editInput.type = 'text';
+                    editInput.value = task.text;
+                    editInput.className = 'bg-transparent border-b-2 border-dashed border-current outline-none flex-grow text-xl md:text-2xl';
+                    
+                    const saveEdit = () => {
+                        const newText = editInput.value.trim();
+                        if (newText) {
+                            task.text = newText;
+                        }
+                        renderTasks();
+                    };
+
+                    editInput.addEventListener('blur', saveEdit);
+                    editInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            saveEdit();
+                        }
+                    });
+
+                    taskDiv.replaceChild(editInput, textSpan);
+                    editInput.focus();
+                });
+
+                // Date & Time Subtext
+                const subtext = document.createElement('span');
+                subtext.textContent = `[${task.date}, ${task.time}]`;
+                subtext.className = 'task-subtext whitespace-nowrap ml-4';
+
+                taskDiv.appendChild(cb);
+                taskDiv.appendChild(textSpan);
+                taskDiv.appendChild(subtext);
+                
+                taskList.appendChild(taskDiv);
+            });
+
+            updateStats();
+        }
+
+        function toggleTask(id, isCompleted, element) {
+            const task = tasks.find(t => t.id === id);
+            if (task) {
+                task.completed = isCompleted;
+                if (isCompleted) {
+                    triggerConfetti(element);
+                }
+                renderTasks();
+            }
+        }
+
+        function triggerConfetti(element) {
+            // Get exact coordinates of the checkbox
+            const rect = element.getBoundingClientRect();
+            // Calculate percentage of screen
+            const x = (rect.left + rect.width / 2) / window.innerWidth;
+            const y = (rect.top + rect.height / 2) / window.innerHeight;
+
+            confetti({
+                particleCount: 80,
+                spread: 60,
+                origin: { x: x, y: y }
+                // Omitting the colors array so it uses default multi-color confetti
+            });
+        }
+
+        function updateStats() {
+            if (tasks.length === 0) {
+                statsEl.style.opacity = '0';
+                return;
+            }
+
+            statsEl.style.opacity = '1';
+            const completedCount = tasks.filter(t => t.completed).length;
+            
+            if (completedCount === 0) {
+                statsEl.textContent = `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`;
+            } else {
+                statsEl.textContent = `${tasks.length} task${tasks.length !== 1 ? 's' : ''} • ${completedCount} checked off`;
+            }
+        }
+
+        textColorPicker.addEventListener('input', (e) => {
+            document.documentElement.style.setProperty('--text-color', e.target.value);
+        });
+
+        bgColorPicker.addEventListener('input', (e) => {
+            document.documentElement.style.setProperty('--bg-color', e.target.value);
+        });
+
+        // Initialize App
+        updateGreeting();
+        
+        // Update greeting every minute just in case
+        setInterval(updateGreeting, 60000);
+    </script>
+</body>
+</html>
