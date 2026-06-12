@@ -131,7 +131,8 @@
     </footer>
 
     <script>
-        let tasks = [];
+        // Load tasks and colors from localStorage, or use defaults
+        let tasks = JSON.parse(localStorage.getItem('todo_tasks')) || [];
         
         // DOM Elements
         const greetingEl = document.getElementById('greeting');
@@ -142,6 +143,15 @@
         
         const textColorPicker = document.getElementById('textColorPicker');
         const bgColorPicker = document.getElementById('bgColorPicker');
+
+        // Apply saved colors on load
+        const savedTextColor = localStorage.getItem('todo_textColor') || '#8a0000';
+        const savedBgColor = localStorage.getItem('todo_bgColor') || '#000000';
+        
+        textColorPicker.value = savedTextColor;
+        bgColorPicker.value = savedBgColor;
+        document.documentElement.style.setProperty('--text-color', savedTextColor);
+        document.documentElement.style.setProperty('--bg-color', savedBgColor);
 
         function updateGreeting() {
             const hour = new Date().getHours();
@@ -188,6 +198,9 @@
 
             tasks.push(newTask);
             
+            // Save to localStorage
+            saveTasks();
+            
             // Reset input area
             mainInput.value = '';
             mainCheckbox.disabled = true;
@@ -223,6 +236,7 @@
                         const newText = editInput.value.trim();
                         if (newText) {
                             task.text = newText;
+                            saveTasks(); // Save after edit
                         }
                         renderTasks();
                     };
@@ -268,6 +282,9 @@
             if (taskIndex > -1) {
                 tasks[taskIndex].completed = isCompleted;
                 
+                // Save to localStorage
+                saveTasks();
+                
                 // Fire confetti if checked off
                 if (isCompleted && element) {
                     triggerConfetti(element);
@@ -280,7 +297,13 @@
         // Delete task
         function deleteTask(id) {
             tasks = tasks.filter(t => t.id !== id);
+            saveTasks(); // Save after deletion
             renderTasks();
+        }
+
+        // Save tasks to localStorage
+        function saveTasks() {
+            localStorage.setItem('todo_tasks', JSON.stringify(tasks));
         }
 
         // Confetti Animation
@@ -316,15 +339,20 @@
         }
 
         textColorPicker.addEventListener('input', (e) => {
-            document.documentElement.style.setProperty('--text-color', e.target.value);
+            const color = e.target.value;
+            document.documentElement.style.setProperty('--text-color', color);
+            localStorage.setItem('todo_textColor', color); // Save color
         });
 
         bgColorPicker.addEventListener('input', (e) => {
-            document.documentElement.style.setProperty('--bg-color', e.target.value);
+            const color = e.target.value;
+            document.documentElement.style.setProperty('--bg-color', color);
+            localStorage.setItem('todo_bgColor', color); // Save color
         });
 
         // Initialize App
         updateGreeting();
+        renderTasks(); // Render any saved tasks on load
         
         // Update greeting every minute just in case
         setInterval(updateGreeting, 60000);
